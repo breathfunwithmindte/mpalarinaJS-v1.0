@@ -17,13 +17,16 @@ module.exports = {
       service_method: service_method
     });
     const result = await Service[service_method](req.$service_props || {
-      query: { ...req.query, ...req.params }, formstate: req.body, req, res, gresponse: res.$gresponse, populate: req.$populate || undefined
+      queries: { ...req.query, ...req.params }, formstate: req.body, req, res, gresponse: res.$gresponse, populate: req.$populate || undefined
     });
-    if(result["service_error"]) {
-      pro.logs.logerr("Service error " + result.description)
-      res.$gresponse.setResponse(400, "Oups !! Something went wrong.")
-      res.$gresponse.setErrors([new ValidationError("service", result["field"] || "unknow", result.description)])
-    }
+    // if(result["service_error"]) {
+    //   pro.logs.logerr("Service error " + result.description)
+    //   res.$gresponse.setResponse(400, "Oups !! Something went wrong.")
+    //   res.$gresponse.setErrors([new ValidationError("service", result["field"] || "unknow", result.description)])
+    // }
+    // if(result) {
+
+    // }
     res.$gresponse.setData(result);
     return 0;
   }

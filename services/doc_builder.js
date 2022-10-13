@@ -30,6 +30,7 @@ module.exports = (turbo_route, name, initial, middlewares, fullpath, response_ty
     if(response_type === "text/html") {
       doc_responses = default_html_response
     } else {
+      console.log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@", curr_path)
       doc_responses = curr_schema["responses"];
     }
   } else {

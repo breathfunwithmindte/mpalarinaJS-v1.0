@@ -1,9 +1,12 @@
 module.exports = class TurboRoute {
 
+  turbo_name = String;
   path = String;
   classmethod = String;
   http_method = String;
   schema_name = String;
+  pre_service_classname = String;
+  pre_service_methodname = String;
   controller_method = String;
   service_classname = String;
   service_methodname = String;
@@ -12,30 +15,71 @@ module.exports = class TurboRoute {
   schema = null;
   pre_path;
 
-  constructor (class_api_method_name, classname, pre_path, authenticated)
+  constructor (class_api_method_name, classname, pre_path, authenticated, index)
   {
-    const { method, path, service_name, schema_name } = this.#prepare_obj_config(class_api_method_name);
+
     this.classname = classname;
+    this.#prepare_obj_config(class_api_method_name, index)
+
     this.classmethod = class_api_method_name;
-    this.http_method = method;
-    this.path = path;
-    this.schema_name = schema_name;
-    this.#setService(service_name);
     this.#setSchema();
     this.pre_path = pre_path;
     this.authenticated = authenticated || false;
 
   }
 
-  #setService (service_name)
+  #prepare_obj_config (string, index)
   {
-    const parts = service_name.split("#")
-    this.service_classname = parts.length > 1 ? parts[0] : this.classname;
-    if(service_name === ".") {
+    const clear_string = string.substring(1, string.length);
+    const [ _method, _path, _service_name, _schema_name, _routename ] = clear_string.split("---");
+    
+    this.http_method = _method === "_" ? "get" : _method;
+    this.path = _path ? _path : "/";
+    
+    if(_service_name && _service_name !== ".") {
+      this.#setService(_service_name);
+    } else {
+      this.service_classname = null;
       this.service_methodname = null;
+      this.pre_service_classname = null;
+      this.pre_service_methodname = null;
+    }
+    this.schema_name = _schema_name || ".";
+
+    this.turbo_name = this.classname.toLowerCase() + "_" + index;
+
+  }
+
+  #service_set_tool (service_string, where_store) 
+  {
+    if(where_store !== "pre_" && where_store !== "") throw new Error("where_store can only be pre or empty string");
+    if(!service_string || service_string === ".") {
+      this[where_store + "service_classname"] = null;
+      this[where_store + "service_methodname"] = null;
       return;
     }
-    this.service_methodname = parts.length > 1 ? parts[1] : parts[0];
+    let [serviceclassname, servicemethodname] = service_string.split("#");
+    if(servicemethodname) {
+      this[where_store + "service_classname"] = serviceclassname;
+      this[where_store + "service_methodname"] = servicemethodname === "." ? null : servicemethodname;
+    } else {
+      this[where_store + "service_classname"] = this.classname;
+      this[where_store + "service_methodname"] = serviceclassname === "." ? null : serviceclassname;
+    }
+  }
+
+  /** @todo bad code will fix it later */
+  #setService (service_string)
+  {
+    if(service_string.split(">").length > 1) {
+      const [pre_service, after_service] = service_string.split(">");
+      this.#service_set_tool(pre_service, "pre_");
+      this.#service_set_tool(after_service, "");
+    } else {
+      this.pre_service_classname = null;
+      this.pre_service_methodname = null;
+      this.#service_set_tool(service_string, "");
+    }
   }
   #setSchema()
   {
@@ -58,19 +102,7 @@ module.exports = class TurboRoute {
     }
   }
 
-  #prepare_obj_config (string)
-  {
-    const clear_string = string.substring(1, string.length);
-    const params = clear_string.split("---");
-
-    const method = params[0] ? params[0] : "get";
-    const path = params[1] ? params[1] : "/";
-    const service_name = params[2] || null;
-    const schema_name = params[3] || null
-    return {
-      method, path, service_name, schema_name
-    }
-  }
+  
 
   log() 
   {
