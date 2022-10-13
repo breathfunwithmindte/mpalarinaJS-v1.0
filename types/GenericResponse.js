@@ -53,6 +53,7 @@ module.exports = class GenericResponse {
         this.data[key] = data[key];
       }
     }
+    return this;
   }
 
   getData() {
@@ -64,32 +65,40 @@ module.exports = class GenericResponse {
 
   /**
    * @param {Number} status
+   * @return {this}
    */
   setStatus(status) {
     this.status = status;
+    return this;
   }
 
   /**
    * @param {String} message
+   * @return {this}
    */
   setMessage(message) {
     this.message = message;
+    return this;
   }
 
   /**
    * @param {Number} status
    * @param {String} message
+   * @return {this}
    */
   setResponse(status, message) {
     this.status = status;
     this.message = message;
+    return this;
   }
 
   /**
    * @doc enable error response;
+   * @return {this}
    */
   setError() {
     this.error = true;
+    return this;
   }
 
   /**

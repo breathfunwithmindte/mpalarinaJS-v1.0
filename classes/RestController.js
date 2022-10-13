@@ -39,8 +39,8 @@ module.exports = class RestController extends Controller {
     }
 
     // ? try to avoid this kind of errors;
-    if(pro.mode === "development") { logwarn("[ERR] 'unknown' - msg=" + error.toString()) }
-    const myerror = new MyError(-1, error.toString(), turbo_route, 500);
+    if(pro.mode === "development") { logwarn("[ERR] 'unknown' - msg=" + error?.toString()) }
+    const myerror = new MyError(-1, error?.toString(), turbo_route, 500);
     res.status(500).json(myerror.response());
   
   }
@@ -89,6 +89,20 @@ module.exports = class RestController extends Controller {
           -1,
           "Type of Controller method is not a function.",
           turbo_route
+        );
+      }
+
+      if (pro.Services[turbo_route.pre_service_classname]) {
+        await service_runner(
+          pro.Services[turbo_route.pre_service_classname],
+          turbo_route.pre_service_methodname,
+          req,
+          res
+        );
+      } else if (!pro.Services[turbo_route.pre_service_classname] && turbo_route.pre_service_methodname) {
+        gresponse.setResponse(
+          500,
+          "Pre Service not found with name = " + turbo_route.pre_service_classname
         );
       }
       

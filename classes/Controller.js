@@ -27,9 +27,9 @@ module.exports = class Controller {
           .filter((f) => typeof f === "function")
       : [];
     this.turbo_routes = new Array();
-    this.api_methods.map((i) =>
+    this.api_methods.map((i, index) =>
       this.turbo_routes.push(
-        new TurboRoute(i, this.name, this.use_pre_path, this.authenticated)
+        new TurboRoute(i, this.name, this.use_pre_path, this.authenticated, index)
       )
     );
     // console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1", this.turbo_routes, classapimethods)

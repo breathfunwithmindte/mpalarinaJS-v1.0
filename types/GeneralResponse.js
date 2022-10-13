@@ -52,6 +52,7 @@ module.exports = class GeneralResponse extends GenericResponse {
         this[key] = info[key];
       }
     }
+    return this;
   }
 
   /**
@@ -66,16 +67,19 @@ module.exports = class GeneralResponse extends GenericResponse {
     } else {
       this.errors.push(error);
     }
+    return this;
   }
   /**
    * @param {ValidationError[]} errors
    * @param {Number?} status
    * @param {String?} message
+   * @return {this}
    */
   setErrors(errors, status, message) {
     if(errors instanceof Array === false) return;
     this.errors = errors;
     this.#default_enable_error(status, message);
+    return this;
   }
 
   validate () {
@@ -96,6 +100,7 @@ module.exports = class GeneralResponse extends GenericResponse {
     } else {
       this.#layout_view = "index"; this.#page_view = parts[0];
     }
+    return this;
   }
 
   setPageView (page_view_prop) { this.#page_view = page_view_prop; }
