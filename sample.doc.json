@@ -1,0 +1,169 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+      "version": "1.0.0",
+      "title": "Reinvent-API",
+      "description": "Reusable and minimalistic API for Hyperledger-fabric Networks",
+      "contact": {
+        "name": "Dev",
+        "email": "dev@gmail.com",
+        "url": "https://dev.github.io/"
+      },
+      "license": {
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT"
+      }
+    },
+    "servers": [
+      {
+        "url": "http://localhost:5000/api/v1"
+      }
+    ],
+    "paths": {
+      "/auth/login": {
+        "post": {
+          "tags": ["API Explorer"],
+          "description": "invoke chaincode function",
+          "operationId": "invoke",
+          "parameters": {
+  
+          },
+          "requestBody": {
+            "description": "body parameters should be passed as the order defined in chaincode function. First argument must be function name to call.",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+  
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successfull response.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": {
+                        "type": "string",
+                        "description": "ok"
+                      },
+                      "data": {
+                        "type": "object",
+                        "properties": {
+                          "users": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {},
+                              "description": "Base on your model"
+                            },
+                            "description": "or anything else --- <sector name> + s"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Recieved not correct data",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/error-format"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Not Authenticated || 401"
+            },
+            "403": {
+              "description": "Not Allowed || 403"
+            },
+            "500": {
+              "description": "Something went wrong || 500"
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "schemas": {
+        "error-format": {
+          "properties": {
+            "error": {
+              "type": "boolean",
+              "description": "default true;"
+            },
+            "total_errors": {
+              "type": "number",
+              "description": "length of the errors"
+            },
+            "message": {
+              "type": "string",
+              "description": "ok"
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "namespace": { "type": "string", "enum": ["query", "body"] },
+                  "field": { "type": "string" },
+                  "error": { "type": "boolean", "description": "true" },
+                  "descriptions": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            },
+            "path": { "type": "string", "description": "ok" },
+            "method": {
+              "type": "string",
+              "description": "ok",
+              "enum": ["GET", "POST", "PATCH", "PUT", "DELETE..."]
+            },
+            "queries": { "type": "object" },
+            "body": { "type": "object" }
+          }
+        },
+        "error": {
+          "properties": {
+            "message": {
+              "type": "string",
+              "description": "something went wrong - maybe some description - always trying to protect the error descriptions on production enviroment"
+            }
+          }
+        },
+        "not-authenticated": {
+          "properties": {
+            "message": {
+              "type": "string",
+              "default": "Not Authenticated",
+              "description": "Not Authenticated"
+            }
+          }
+        },
+        "not-allowed": {
+          "properties": {
+            "message": {
+              "type": "string",
+              "default": "Not Allowed",
+              "description": "Not Allowed"
+            }
+          }
+        }
+      }
+    }
+  }
+  

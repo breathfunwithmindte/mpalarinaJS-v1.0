@@ -1,0 +1,153 @@
+const Controller = require("./Controller");
+const Validator = require("../utils/validator");
+const { service_runner } = require("../services/ServiceRunner");
+const fs = require("fs");
+
+
+module.exports = class ViewController extends Controller {
+
+  static restapi = false;
+  static response_type = "text/html";
+
+  async run(express, turbo_route) {
+    const { req, res } = express;
+    try {
+      if (req.$validator_error) {
+        WriteInfo(req, res, turbo_route);
+        req.$status = 400;
+        res.$response = {...res.$response, ...{
+            total_errors: req.$validator_errors.length,
+            errors: req.$validator_errors,
+            path: req.route.path,
+            method: req.method,
+            queries: req.$queries,
+            body: req.$body,
+        }}
+        if (req.$error) return req.$mprender(req, res, turbo_route, null);
+      }
+
+
+
+      const current_method = this[turbo_route.classmethod];
+
+      // todo improve error when class method is not a function //
+      if (typeof current_method !== "function")
+        throw new Error("Type of method is not function ");
+
+      const user = req.user ? req.user : null;
+
+      if (turbo_route.authenticated && !user) return req.$mprender(req, res, turbo_route, null);
+      if (req.$error) return req.$mprender(req, res, turbo_route, null);
+
+      const props_controller = {
+        queries: req.$queries,
+        body: req.$body,
+        params: req.$params,
+        cookies: req.$cookies,
+        user: user,
+      };
+
+      const result = await current_method(
+        express, // has req and res
+        props_controller,
+        turbo_route // turbo route
+      );
+
+      if (typeof result === "string") {
+
+        const current_service = pro.Services[turbo_route.service_classname];
+        if (current_service) {
+          const service_result = await service_runner(current_service, turbo_route.service_methodname, req);
+          if (service_result.status === -1) {
+            req.$status === 500;
+            req.$message = service_result.message || "Something went wrong - ERROR not catched in service.";
+          } else {
+            if (!service_result.result) {
+              console.log(service_result.message);
+            }
+            if (service_result.result && service_result.result.error)
+              req.$status = 500;
+              res.$response = {...res.$response, ...service_result.result}
+          }
+        } else if (!current_service && turbo_route.service_methodname) {
+          res.$status = 500;
+          res.$message = "Service not found";
+        }
+        WriteInfo(req, res, turbo_route);
+
+        req.$mprender(req, res, turbo_route, result);
+
+        return;
+      }
+    } catch (error) {
+      WriteInfo(req, res, turbo_route);
+      console.log(error);
+      require("fs").appendFileSync(
+        pro.root + "/tmp/logs/RestController.error",
+        `
+~~~~~ ${new Date()} ~~~~~
+      name: Rest Controller Error
+      severity: Critical
+      error: ${error.toString()}
+~~~~~ message end ~~~~~
+      `
+      );
+      res
+        .status(500)
+        .json({
+          message:
+            "Something went wrong. Fatar error for the server. Try again later.",
+        });
+    }
+  }
+};
+
+function WriteInfo(req, res, turbo_route) {
+  if (pro.mode === "development") {
+    try {
+      const writable_obj = {
+        name: "Rest Controller Info",
+        $status: req.$status,
+        $response: res.$response,
+        $message: req.$message,
+        $validator_error: req.$validator_error,
+        $validator_errors: req.$validator_errors,
+        $cookies: req.$cookies,
+        $queries: req.$queries,
+        $params: req.$params,
+        $body: req.$body,
+        $turbo_route: turbo_route,
+        $service_props: req.$service_props,
+        $error: req.$error,
+        $view: req.$view,
+        $error_log_id: req.$error_log_id,
+        createdAt: new Date(),
+      };
+      fs.writeFileSync(
+        pro.root + "/tmp/logs/RestController.info.json",
+        `${JSON.stringify(writable_obj, null, 2)}`
+      );
+      const currdata = new Date().toLocaleDateString();
+      const currdatetime = new Date().toLocaleTimeString();
+      const filename =
+        currdata.replaceAll("/", "_") +
+        " " +
+        currdatetime.replaceAll(":", "_").replaceAll(".", "");
+      if (fs.existsSync(pro.root + "/tmp/logs/DELETEME_restinfo")) {
+        fs.writeFileSync(
+          pro.root + `/tmp/logs/DELETEME_restinfo/${filename}.info.json`,
+          `${JSON.stringify(writable_obj, null, 2)}`
+        );
+      } else {
+        fs.mkdirSync(pro.root + "/tmp/logs/DELETEME_restinfo");
+        fs.writeFileSync(
+          pro.root + `/tmp/logs/DELETEME_restinfo/${filename}.info.json`,
+          `${JSON.stringify(writable_obj, null, 2)}`
+        );
+      }
+    } catch (e) {
+      console.log(e);
+      console.log(e.toString());
+    }
+  }
+}
