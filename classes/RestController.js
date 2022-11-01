@@ -12,7 +12,7 @@ module.exports = class RestController extends Controller {
   controller_type = "rest"
 
   /**
-   * @interface - you can override this default behaviour of a rest controller;
+   * @override
    * @doc - controller error handler
    * @param {*} error - Enum(GeneralResponse | MyError | Any)
    * @param {Object} req - http request instance
@@ -24,7 +24,7 @@ module.exports = class RestController extends Controller {
   {
     if(error instanceof GeneralResponse) {
       error.validate();
-      if(pro.mode === "development") { logwarn("[ERR] 'GeneralResponse' - status=" + error.status) }
+      if(pro.mode === "development") { logwarn("[ERR] 'GeneralResponse' - status=" + error.status); console.log(error) }
       res.status(error.status).json(error);
       this.log_dev(req, res, turbo_route, null)
       return;
@@ -45,11 +45,6 @@ module.exports = class RestController extends Controller {
   
   }
 
-  error_handler_view ()
-  {
-
-  }
-
   /**
    *
    * @param {*} express
@@ -58,110 +53,27 @@ module.exports = class RestController extends Controller {
    */
   async run(express, turbo_route) {
     const { req, res } = express;
-
-    /**
-     * @type {GeneralResponse}
-     */
+    /** @type {GeneralResponse} */
     const gresponse = res.$gresponse;
-    
+
     try {
-
       // ? unsure why this exist ... will implement something later;
-      if (res.$error) {
-        throw gresponse;
-        return;
-      }
+      if (res.$error) {throw gresponse;}
 
-      // primary validation stuff of a controller;
-      if (req.$validator_error && req.$validator_errors instanceof Array === true) {
-        gresponse.setErrors(req.$validator_errors);
-        gresponse.setInfo({
-          path: req.route.path,
-          method: req.method,
-          queries: req.query,
-          body: req.body,
-        });
-        throw gresponse;
-      }
+      if (req.$validator_error && req.$validator_errors instanceof Array === true) this.on_validation_error(req, gresponse);
 
-      if (typeof this[turbo_route.classmethod] !== "function") {
-        throw new MyError(
-          -1,
-          "Type of Controller method is not a function.",
-          turbo_route
-        );
-      }
-
-      if (pro.Services[turbo_route.pre_service_classname]) {
-        await service_runner(
-          pro.Services[turbo_route.pre_service_classname],
-          turbo_route.pre_service_methodname,
-          req,
-          res
-        );
-      } else if (!pro.Services[turbo_route.pre_service_classname] && turbo_route.pre_service_methodname) {
-        gresponse.setResponse(
-          500,
-          "Pre Service not found with name = " + turbo_route.pre_service_classname
-        );
-      }
-      
-
-      if (turbo_route.authenticated && !req.user) throw new MyError(
-        -1, null, turbo_route, 401, "Not Authenticated"
-      )
-
-      const props_controller = {
-        files: req.files,
-        queries: req.query,
-        body: req.body,
-        params: req.params,
-        cookies: req.$cookies,
-        user: req.user,
-      };
+      await this.run_preservice(turbo_route, req, res);
 
       const result = await this[turbo_route.classmethod](
-        express, // has req and res
-        props_controller,
-        gresponse,
-        turbo_route // turbo route,
+        express,
+        { files: req.files, queries: req.query, body: req.body, params: req.params, cookies: req.$cookies, user: req.user },
+        gresponse, turbo_route 
       );
+
       if (result === null || result === false) return;
-
-      
-      if (typeof result === "string") {
-        res.send(result);
-        return;
-      }
-
-      if (res.$error) {
-        throw gresponse;
-        return;
-      }
-
-      // ? ~~~~~ if result from controller is object 
-      if (typeof result === "object") {
-        gresponse.setData(result);
-      }
-
-      // ? ~~~~~ if result from controller is undefined
-      if (result === undefined) {
-        const current_service = pro.Services[turbo_route.service_classname];
-
-        if (current_service) {
-          await service_runner(
-            current_service,
-            turbo_route.service_methodname,
-            req,
-            res
-          );
-        } else if (!current_service && turbo_route.service_methodname) {
-          gresponse.setResponse(
-            500,
-            "Service not found with name = " + turbo_route.service_methodname
-          );
-        }
-      }
+      if (typeof result === "string") { res.send(result); return; }
+      if (typeof result === "object") gresponse.setData(result);
+      if (result === undefined) await this.run_service(turbo_route, req, res);
 
       this.log_dev(req, res, turbo_route, null);
       gresponse.validate();

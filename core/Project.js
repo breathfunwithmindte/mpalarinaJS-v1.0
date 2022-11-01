@@ -82,6 +82,11 @@ module.exports = class Project {
   logs = logs
 
   /**
+   * @type {String[]} classnames;
+   */
+  classnames = new Array();
+
+  /**
    * @doc {*} list 
    */
   db_connected = false;
@@ -135,7 +140,12 @@ module.exports = class Project {
   setViews (layouts, pages)
   {
     layouts.map(i => this.Layouts.set(i.filename.split(".")[0], fs.readFileSync(i.fulldir, "utf-8")));
-    pages.map(i => this.Views.set(i.filename.split(".")[0], fs.readFileSync(i.fulldir, "utf-8")))
+    pages.map(i => {
+      let actual_classname = "";
+      // console.log(this.classnames, i.classname)
+      if(!i.classname.startsWith("system")) { actual_classname = i.classname + "_" };
+      this.Views.set(actual_classname + i.filename.split(".")[0], fs.readFileSync(i.fulldir, "utf-8"))
+    });
   }
 
   setSchemaList (list)
@@ -153,6 +163,7 @@ module.exports = class Project {
     list.map(i => {
       // do smthing //
       const curr_class = require(i.fulldir);
+      const classname = i.filename.split(".")[0];
       const curr_instance = new curr_class();
       if(curr_instance instanceof TestController === false) {
         logs.logerr(
@@ -161,12 +172,13 @@ module.exports = class Project {
         return;
       }
       curr_instance.init();
-      this.TestControllers.set(i.filename.split(".")[0], curr_instance);
+      this.TestControllers.set(classname, curr_instance);
     })
   }
 
   setControllers (list)
   {
+    console.log("#$######## SETTING CONTROLLERS")
     const docs = [];
     list.map(i => {
       try {
@@ -177,6 +189,9 @@ module.exports = class Project {
   
         pro.Controllers.set(ControllerClass.name, ControllerClass);
         const ControllerInstance = new ControllerClass();
+
+        if(this.classnames.some(s => s === ControllerClass.name)) throw new Error("Controller already exist with that classname");
+        this.classnames.push(ControllerClass.name);
   
         // instance will have the middlewares functions //
         pro.ControllersInstances.set(ControllerClass.name, ControllerInstance);

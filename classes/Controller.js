@@ -37,6 +37,36 @@ module.exports = class Controller {
 
   constructor() {}
 
+  /** @interface - you can override this default behaviour of a controller; */
+  error_handler_rest (error, req, res, turbo_route) { res.status(500).json({ message: "Something went wrong" }) }
+
+  async run_service (turbo_route, req, res) {
+    if(turbo_route.actual_service) {
+      await turbo_route.actual_service[turbo_route.service_methodname](req.$service_props || {
+        queries: { ...req.query, ...req.params }, formstate: req.body, req, res, populate: req.$populate || undefined
+      }, res.$gresponse);
+    }
+  }
+
+  async run_preservice (turbo_route, req, res) {
+    if(turbo_route.actual_pre_service) {
+      await turbo_route.actual_pre_service[turbo_route.pre_service_methodname](req.$service_props || {
+        queries: { ...req.query, ...req.params }, formstate: req.body, req, res, populate: req.$populate || undefined
+      }, res.$gresponse);
+    }
+  }
+
+  async on_validation_error (req, gresponse) {
+    gresponse.setErrors(req.$validator_errors);
+    gresponse.setInfo({
+      path: req.route.path,
+      method: req.method,
+      queries: req.query,
+      body: req.body,
+    });
+    throw gresponse;
+  }
+
 
   log_dev(req, res, turbo_route, err) {
     const fs = require("fs");

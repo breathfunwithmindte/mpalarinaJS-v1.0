@@ -35,11 +35,11 @@ module.exports = class Mpalarina {
 
       app.init();
       app.connect_db_v1();
-      app.registerViews();
       app.registerServices();
       app.registerSchemas();
       app.registerMiddlewares();
       app.registerControllers();
+      app.registerViews();
       app.registerTestControllers();
       /**
        * @doc creating new Express.Router for each router in the application config ... the initial is used as prefix for each path;
@@ -49,24 +49,18 @@ module.exports = class Mpalarina {
       });
 
       /**
-       * @doc here is the actual where each controller-router is registered to the express;
+       * @doc // ! here is the actual where each controller-router is registered to the express;
        */
-
       pro.Controllers.forEach((ControllerClass, key) => {
-        const current_router_name = server.getRouter(ControllerClass.router)
-          ? ControllerClass.router
-          : app.routers[0].name;
 
-        for (
-          let index = 0;
-          index < ControllerClass.turbo_routes.length;
-          index++
-        ) {
-          server.addRoute(
-            current_router_name,
-            ControllerClass.turbo_routes[index],
-            ControllerClass.use_middlewares
-          );
+        //  this line getting which router will be used. If controller no specify any router, it will use the default router
+        // with index 0 from app routers. Currently not something special ... but exist just in case
+        const current_router_name = server.getRouter(ControllerClass.router) ? ControllerClass.router: app.routers[0].name;
+
+        // each controller can contain multiple turboroutes.... looop for each one to register it in express server;
+        for (let index = 0;index < ControllerClass.turbo_routes.length;index++) 
+        {
+          server.addRoute(current_router_name, ControllerClass.turbo_routes[index], ControllerClass.use_middlewares);
         }
       });
 
@@ -79,7 +73,9 @@ module.exports = class Mpalarina {
         server.routers.forEach((v) => v.routes.map((r) => routes.push(r)));
         console.table(routes);
       }
+      
       app.after_server(server.app);
+
       if(app.clusters === 1) {
         server.listen();
       }else {
@@ -92,19 +88,9 @@ module.exports = class Mpalarina {
         }
       }
       if(cluster.isMaster) {
-        console.log(
-          `\x1b[${35}mServer is running in ${app.clusters} ${
-            app.clusters === 1 ? "cluster" : "clusters"
-          }.`,
-          "\x1b[0m"
-        );
+        console.log(`\x1b[${35}mServer is running in ${app.clusters} ${  app.clusters === 1 ? "cluster" : "clusters"}.`,"\x1b[0m");
         const used = process.memoryUsage().heapUsed / 1024 / 1024;
-        console.log(
-          `\x1b[${35}mApproximately memory usage is ${
-            Math.round(used * 100) / 100
-          } MB.`,
-          "\x1b[0m"
-        );
+        console.log(`\x1b[${35}mApproximately memory usage is ${Math.round(used * 100) / 100} MB.`, "\x1b[0m" );
       }
     } catch (e) {
       console.log(e, "\n");

@@ -211,7 +211,11 @@ module.exports = class SysApplication {
             fulldir: root + this.view_path + "/layouts/" + l,
           };
         }),
-        files
+        files.map((n) => {
+          const view_dir_in = n.fulldir.split(this.view_path + "/pages/")[1];
+          const current_classname = view_dir_in.split("/").slice(0, view_dir_in.split("/").length - 1).join("_");
+          return {...n, classname: current_classname};
+        })
       );
       if (this.logs === true) {
         logs.logpass("Views are set successfully.");

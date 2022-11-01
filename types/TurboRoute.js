@@ -13,26 +13,62 @@ module.exports = class TurboRoute {
   schema_classname = String;
   authenticated = false;
   schema = null;
+  render_view = null;
   pre_path;
+
+  actual_pre_service = null;
+  actual_service = null;
+
 
   constructor (class_api_method_name, classname, pre_path, authenticated, index)
   {
 
     this.classname = classname;
     this.#prepare_obj_config(class_api_method_name, index)
+    this.#validate_service();
 
     this.classmethod = class_api_method_name;
     this.#setSchema();
     this.pre_path = pre_path;
     this.authenticated = authenticated || false;
 
+    //console.log(this);
+
+
+  }
+
+  #validate_service ()
+  {
+    if(
+      !pro.Services[this.pre_service_classname] && this.pre_service_methodname
+    ) {
+      throw new Error(`Service not found with name ${this.pre_service_classname} `)
+    }else {
+      this.actual_pre_service = pro.Services[this.pre_service_classname];
+    }
+    if(this.actual_pre_service) {
+      if(typeof this.actual_pre_service[this.pre_service_methodname] !== "function") throw new Error(
+        `Service not contain method with name ${this.pre_service_methodname} `
+      )
+    }
+    if(
+      !pro.Services[this.service_classname] && this.service_methodname
+    ) {
+      throw new Error(`Service not found with name ${this.service_classname} `)
+    }else {
+      this.actual_service = pro.Services[this.service_classname];
+    }
+    if(this.actual_service) {
+      if(typeof this.actual_service[this.service_methodname] !== "function") throw new Error(
+        `Service not contain method with name ${this.service_methodname} `
+      )
+    }
   }
 
   #prepare_obj_config (string, index)
   {
     const clear_string = string.substring(1, string.length);
-    const [ _method, _path, _service_name, _schema_name, _routename ] = clear_string.split("---");
-    
+    const [ _method, _path, _service_name, _schema_name, _routename] = clear_string.split("---");
     this.http_method = _method === "_" ? "get" : _method;
     this.path = _path ? _path : "/";
     
@@ -46,7 +82,7 @@ module.exports = class TurboRoute {
     }
     this.schema_name = _schema_name || ".";
 
-    this.turbo_name = this.classname.toLowerCase() + "_" + index;
+    this.turbo_name = this.#validName(_routename, index)
 
   }
 
@@ -68,6 +104,8 @@ module.exports = class TurboRoute {
     }
   }
 
+
+
   /** @todo bad code will fix it later */
   #setService (service_string)
   {
@@ -81,6 +119,8 @@ module.exports = class TurboRoute {
       this.#service_set_tool(service_string, "");
     }
   }
+
+
   #setSchema()
   {
     this.schema_classname = this.classname;
@@ -123,6 +163,22 @@ module.exports = class TurboRoute {
   getSchemaName ()
   {
     return this.schema_classname + " # " + this.schema_name;
+  }
+
+
+
+  /**
+   * 
+   * @param {String?} name 
+   * @param {Int} index
+   * @doc name is the 4rth parameter on classmethod string.
+   * @returns {String} 
+   */
+  #validName (name, index)
+  {
+    if(!name) return this.classname.toLowerCase() + "_" + index;
+    if(name === ".") return this.classname.toLowerCase() + "_" + index;
+    return name;
   }
 
 }

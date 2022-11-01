@@ -4,6 +4,8 @@ const { service_runner } = require("../services/ServiceRunner");
 const GeneralResponse = require("../types/GeneralResponse");
 const MyError = require("../types/MyError");
 const TurboRoute = require("../types/TurboRoute");
+const { logwarn } = require("../utils/logs");
+const ejs = require("ejs");
 
 /**
  * @doc
@@ -23,6 +25,31 @@ const TurboRoute = require("../types/TurboRoute");
 module.exports = class ViewController extends Controller {
   static restapi = false;
   static response_type = "text/html";
+
+  error_handler_rest (error, req, res, turbo_route)
+  {
+    if(error instanceof GeneralResponse) {
+      error.validate();
+      if(pro.mode === "development") { logwarn("[ERR] 'GeneralResponse' - status=" + error.status) }
+      this.render(res, error, error);
+      this.log_dev(req, res, turbo_route, null)
+      return;
+    }
+
+    if(error instanceof MyError) {
+      if(pro.mode === "development") { logwarn("[ERR] 'MyError' - status=" + error.status) }
+      // ! here on production if severirty is -1 or -2 error will be recorded;
+      this.log_dev(req, res, turbo_route, error);
+      this.render(res, res.$gresponse, error.response());
+      return;
+    }
+
+    if(pro.mode === "development") { logwarn("[ERR] 'unknown' - msg=" + error?.toString()) }
+    const myerror = new MyError(-1, error?.toString(), turbo_route, 500);
+    this.render(res, res.$gresponse, myerror.response());
+  }
+
+
   /**
    *
    * @param {*} express
@@ -31,95 +58,75 @@ module.exports = class ViewController extends Controller {
    */
   async run(express, turbo_route) {
     const { req, res } = express;
-
-    /**
-     * @type {GeneralResponse}
-     */
+    /** @type {GeneralResponse} */
     const gresponse = res.$gresponse;
 
     try {
+      // ? unsure why this exist ... will implement something later;
+      if (res.$error) {throw gresponse;}
 
-      if (res.$error) {
-        throw gresponse;
-        return;
-      }
+      if (req.$validator_error && req.$validator_errors instanceof Array === true) this.on_validation_error(req, gresponse);
 
-      gresponse.setView(res.$view); // default behavior;
-      console.log(gresponse.getLayoutView(), "#############33 !!!!!!!!!!! 11111;")
-      // !debug console.log(gresponse.getLayoutView(), "initial");
-
-      if (req.$validator_error) {
-        gresponse.setErrors(req.$validator_errors);
-        gresponse.setInfo({
-          path: req.route.path,
-          method: req.method,
-          queries: { ...req.params, ...req.queries, ...req.$params, ...req.$queries },
-          body: { ...req.body, ...req.$body }
-        });
-        throw gresponse;
-      }
-
-      if (typeof this[turbo_route.classmethod] !== "function")
-        throw new MyError(
-          -1,
-          "Type of controller method is not a function.",
-          turbo_route
-        );
-
-      if (turbo_route.authenticated && !req.user)
-        throw new MyError(1, null, turbo_route, 401, "Not Authenticated");
-
-      const props_controller = {
-        files: req.files,
-        queries: req.$queries,
-        body: req.$body,
-        params: req.$params,
-        cookies: req.$cookies,
-        user: req.user,
-      };
+      await this.run_preservice(turbo_route, req, res);
 
       const result = await this[turbo_route.classmethod](
-        express, // has req and res
-        props_controller,
-        gresponse,
-        turbo_route // turbo route,
+        express,
+        { files: req.files, queries: req.query, body: req.body, params: req.params, cookies: req.$cookies, user: req.user },
+        gresponse, turbo_route 
       );
+      if (result === null || result === false) return;
+      if (typeof result === "string") { gresponse.setView(result); }
+      if (typeof result === "object") gresponse.setData(result);
+      if (result === undefined) await this.run_service(turbo_route, req, res);
 
-      if(result === null || result === false) return;
-
-      // ! run service ;
-      const current_service = pro.Services[turbo_route.service_classname];
-      if (current_service) {
-        await service_runner(
-          current_service,
-          turbo_route.service_methodname,
-          req,
-          res
-        );
-      } else if (!current_service && turbo_route.service_methodname) {
-        throw new MyError(-1, "Service not found with name = " + turbo_route.service_methodname, turbo_route);
-      }
-
-      if (typeof result === "string") {
-        gresponse.setView(result);
-      } 
-      // this.log_dev(req, res, turbo_route, null);
       gresponse.validate();
-      res.$mprender(req, res, turbo_route);
 
+      this.auto_detect_view(gresponse, turbo_route);
+
+      this.render(res, gresponse, gresponse)
 
     } catch (error) {
-      if (error instanceof GeneralResponse) {
-        gresponse.validate();
-        gresponse.validatePageView(req.$views); // on throw gresponse it is always run this validate view method;
-        res.$mprender(req, res, turbo_route);
-      } else if (error instanceof MyError) {
-        //this.log_dev(req, res, turbo_route, error);
-        res.$mpdebugrender(req, res, turbo_route, "index", error);
-      } else {
-        const myerror = new MyError(-1, error.toString(), turbo_route, 500, "je;;pw asdasd");
-        res.$mpdebugrender(req, res, turbo_route, "index", myerror);
-      }
+      this.error_handler_rest(error, req, res, turbo_route);
     }
   }
+
+  /**
+   * @param {HttpResponse} res - http response instance;
+   * @param {GeneralResponse} gresponse 
+   * @returns 
+   */
+  render (res, gresponse, gstate) {
+    try {
+      let current_layout = pro.Layouts.get(gresponse.getLayout());
+      if(!current_layout) return res.send("Layout not found");
+  
+      current_layout = current_layout.replace("%%yield%%", pro.Views.get(gresponse.getView()));
+    
+      let template = ejs.compile(current_layout, {
+        root: [
+          `${root}${mpapp.view_path}/`,
+          `${root}${mpapp.view_path}/turbo_components/`, 
+          `${root}${mpapp.view_path}/components/`
+        ]
+      })
+      // maybe deep clone ? JSON.parse(JSON.stringify(gstate))
+      return res.send(template({ gstate: gstate, gresponse: gresponse }));
+  
+    } catch (err) {
+      return res.send("error actual render" + err.toString())
+    }
+  }
+
+  /**
+   * @param {GeneralResponse} gresponse 
+   * @param {TurboRoute} turbo_route 
+   */
+  auto_detect_view (gresponse, turbo_route)
+  {
+    console.log(gresponse.getView());
+    console.log(this.name);
+    console.log(turbo_route.turbo_name);
+  }
+
+
 };

@@ -91,15 +91,13 @@ module.exports = class MpServer {
     const current_controller = pro.ControllersInstances.get(turbo_route.classname);
     const current_controller_class = pro.Controllers.get(turbo_route.classname);
 
-    console.log(turbo_route.classname, turbo_route.path, middlewares)
-
     router[turbo_route.http_method.toLowerCase()] (turbo_route.getFullpath(), 
       
       (req, res, next) => this.#middlewares.primary_middleware(req, res, next, turbo_route), /** ? middleware validate queries and body */
 
       (req, res, next) => {if(pro.mode === "development"){
         //console.log(JSON.stringify(turbo_route));
-        pro.logs.logc(35, `classname => ${turbo_route.classname} path => ${turbo_route.path + "\t classmethod =>\t" + turbo_route.classmethod}`)
+        //pro.logs.logc(35, `classname => ${turbo_route.classname} path => ${turbo_route.path + "\t classmethod =>\t" + turbo_route.classmethod}`)
       };
         next()
       }, /** log some info only for dev mode */
@@ -112,14 +110,13 @@ module.exports = class MpServer {
     const response_type = current_controller_class.response_type;
 
     routes.push({ 
-      router: `#${name}::${turbo_route.turbo_name}`,
-      classname: turbo_route.classname, 
-      path: fullpath, 
-      method: turbo_route.http_method,
-      pre_service: `${turbo_route.pre_service_classname} # ${turbo_route.pre_service_methodname || "none"}`,
-      service: `${turbo_route.service_classname} # ${turbo_route.service_methodname || "none"}`,
+      namespaces: `#${name}::${turbo_route.classname}::${turbo_route.turbo_name}`,
+      http: "[" + turbo_route.http_method.toUpperCase() + "] " + fullpath, 
+      services: `${
+        turbo_route.pre_service_classname}#${turbo_route.pre_service_methodname || "none"
+      } < ${turbo_route.service_classname}#${turbo_route.service_methodname || "none"}`,
       schema: turbo_route.schema ? turbo_route.getSchemaName() : "none",
-      response_type: response_type
+      res: response_type.split("/")[1]
     })
 
     doc_builder(turbo_route, name, initial, middlewares, fullpath, response_type);
